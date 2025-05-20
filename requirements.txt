@@ -1,5 +1,4 @@
 azure-functions==1.23.0
-azure-functions-worker==1.11.0
 azure-storage-blob==12.19.0
 azure-cosmos==4.6.0
 numpy==1.23.5
