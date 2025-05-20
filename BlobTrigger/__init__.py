@@ -1,53 +1,34 @@
-
 import logging
 import azure.functions as func
-import os, io
-import pandas as pd
+import json
+from azure.cosmos import CosmosClient
 
-import json    
+import os
 
-import azure.cosmos.cosmos_client as cosmos_client
-import azure.cosmos.errors as errors
-
-
-config = {
-    'ENDPOINT': os.environ['ENDPOINT'],
-    'PRIMARYKEY': os.environ['PRIMARYKEY'],
-    'DBLink': os.environ['DBLink']
-}
-
-def main(myblob: func.InputStream):
-    logging.info(f"Python blob trigger function processed blob \n"
-                 f"Name: {myblob.name}\n"
-                 f"Blob Size: {myblob.length} bytes")
-    file = myblob.read()
-    logging.info (type(file))
-    df = pd.read_csv(io.BytesIO(file), sep=';', dtype=str)
-    logging.info (df)
-    results = []
-    results = json.loads(df.to_json(orient='records'))
-    logging.info (len(results))
-    client = cosmos_client.CosmosClient(url_connection=config['ENDPOINT'], auth={'masterKey': config['PRIMARYKEY']})
+def main(blob: func.InputStream):
+    logging.info(f"Processing blob: {blob.name}, Size: {blob.length} bytes")
     
-    for item in results:
+    # 1. CSV 내용 가져오기
+    contents = blob.read().decode('utf-8').splitlines()
 
-        logging.info("Import")
-        item['id'] = item['CONTRACT_ID']
-        logging.info(json.dumps(item,indent=2))
+    # 2. 헤더 분리
+    header = contents[0].split(',')
+    rows = contents[1:]
 
-        try:
-            client.CreateItem(config['DBLink'], item)
-        except errors.HTTPFailure as e:
-            if e.status_code == 409:
-                  query = {'query': 'SELECT * FROM c where c.id="%s"' % item['id']}
-                  options = {}
-                  
-                  docs = client.QueryItems(config['DBLink'], query, options)
-                  doc = list(docs)[0]
+    # 3. Cosmos DB 연결
+    endpoint = os.environ["COSMOS_DB_ENDPOINT"]
+    key = os.environ["COSMOS_DB_KEY"]
+    client = CosmosClient(endpoint, key)
+    database = client.get_database_client("babblee")
+    container = database.get_container_client("steps")
 
-                  # Get the document link from attribute `_self`
-                  doc_link = doc['_self']
-                  client.ReplaceItem(doc_link, item)
+    # 4. 행마다 문서로 저장
+    for line in rows:
+        values = line.split(',')
+        doc = {header[i]: values[i] for i in range(len(header))}
+        container.upsert_item(doc)
+
+    logging.info("✅ CSV 파일이 Cosmos DB에 저장되었습니다.")
 
 
         
