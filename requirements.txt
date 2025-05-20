@@ -1,6 +1,6 @@
-azure-functions==1.0.0a5
-azure-functions-worker==1.0.0a6
-numpy==1.16.1
-pandas==0.24.1
+azure-functions==1.7.0
+azure-functions-worker==1.10.0
+numpy==1.24.4
+pandas==1.5.3
 azure-cosmos==3.0.2
 
